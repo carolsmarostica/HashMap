@@ -7,7 +7,12 @@
 int endereco(int chave, int n){
     int soma=0, j=0;
     while(j<12){
-        soma= [soma + (100*chave[j]) + chave[j+1]] % [maximo valor da dobra das chaves minuto 26:50];
+        soma= [soma + (100*chave[j]) + chave[j+1]] % 19937;
+        //maximo valor da dobra das chaves minuto 26:50
+        // zz | zz
+        //90+90 | 90+90
+        //9090 | 9090
+        // 18180 -> numero primo 19937
         j=j+2; 
     }
     return soma%n;
