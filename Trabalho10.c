@@ -6,7 +6,7 @@
 
 int endereco(int chave, int n){
     int soma=0, j=0;
-    while(j<12){
+    while(j<12){ //12 caracteres fixos 
         soma= [soma + (100*chave[j]) + chave[j+1]] % 19937;
         //maximo valor da dobra das chaves minuto 26:50
         // zz | zz
