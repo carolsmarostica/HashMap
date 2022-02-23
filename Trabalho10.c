@@ -9,14 +9,14 @@
 FILE *principal;
 FILE *indice;
 
-typedef struct inserir{ //struct para a funcao carrega_arquivos
+typedef struct tipo1{ //struct para a funcao carrega_arquivos
 	char CodCli[3];
 	char CodF[3];
 	char NomeCli[50];
 	char NomeF[50];
 	char Genero[50];
 }TIPO1;
-typedef struct buscar{ //struct para a funcao carrega_arquivos
+typedef struct tipo2{ //struct para a funcao carrega_arquivos
 	char CodCli[3];
 	char CodF[3];
 }TIPO2;
@@ -30,7 +30,11 @@ typedef enum m{ //organizar o menu
 	inserir=1, remover, buscar, carregar, sair=0 
 }MENU;
 
-void carrega_arquivos(){
+typedef enum b{ //booleano
+	true=1, false=0 
+}BOOL;
+
+void carrega_arquivos(){//upload dos dados que devem ser inseridos, buscados e removidos
     FILE *arq;
     int i=0;
 	//carrega vetor de struct add
@@ -51,21 +55,21 @@ void carrega_arquivos(){
 		    fread(&busca[i], sizeof(TIPO2), 1, arq);
             i++;
         }
-        fclose(arq);//fecha o arquivo insere
+        fclose(arq);//fecha o arquivo busca
     //carrega vetor de struct remocao
-	    arq = fopen("Arquivos//remove.bin", "r+b");//abre o arquivo busca
+	    arq = fopen("Arquivos//remove.bin", "r+b");//abre o arquivo remocao
 	    rewind(arq);//volta ao comeco do arquivo por garantia
-	    //salva os registros de busca em um vetor auxiliar busca
+	    //salva os registros de busca em um vetor auxiliar remocao
 	    i=0;
         while(!feof(arq)){
 		    fread(&remocao[i], sizeof(TIPO2), 1, arq);
             i++;
         }
-        fclose(arq);
+        fclose(arq);//fecha o arquivo remocao
 	printf("----Upload realizado----\n");
 	return;
 }
-void inicializa(){
+void inicializa(){//abre ou cria os arquivos (principal e indice)
     int i=0, aux=0;
     //INICIALIZACAO DO ARQUIVO PRINCIPAL
     if(access("principal.bin", F_OK)!=0){ //se o arquivo nao existe
@@ -86,21 +90,20 @@ void inicializa(){
     if(access("indice.bin", F_OK)!=0){ //se o arquivo nao existe
         indice = fopen("indice.bin", "w+b"); //cria o arquivo de indice
         for(i=0;i<27;i++){
-            fwrite(&aux, sizeof(int),1, indice);
+            fwrite(&aux, sizeof(int),1, indice);//inicializa todas as posicoes valendo 0
         }
     }else{ //se o arquivo existe
         indice = fopen("indice.bin", "r+b"); //le o arquivo dos registros
     }
 
 }
-int endereco(int chave){
+int endereco(int chave){//pega o endereco em que a chave deve ser inserida
     int end=0;
-    end = chave % 13;
+    end = chave % 13;//metodo da divisao inteira
     return end;
 }
-void escrever(){
-    int i;
-     int ind_add, distanciap_origem;
+void escrever(){//escreve no arquivo principal
+    int i, ind_add, distanciap_origem;
 
     //coleta dos indices
     fseek(principal, 0, 0);
@@ -114,9 +117,8 @@ void escrever(){
     fwrite(&add[ind_add].NomeCli, sizeof(char),50,principal);
     fwrite(&add[ind_add].NomeF, sizeof(char),50,principal);
     fwrite(&add[ind_add].Genero, sizeof(char),50,principal);
-
+    //escreve no arquivo de indice a distancia da chave no arquivo principal
     fwrite(&distanciap_origem,sizeof(int),1,indice);
-                
     //atualizacao do header do arquivo principal
     ind_add++;
     fseek(principal, 0, 0);
@@ -125,9 +127,9 @@ void escrever(){
     fseek(principal,15,0);    
     fwrite(&distanciap_origem, sizeof(int), 1, principal);
     
-   return;
+    return;
 }
-void atualiza(int a){
+void atualiza(int a){//funcao que atualiza o numero de registros no arquivo
     int ind=0;
     fseek(indice,-4, SEEK_END);
     fread(&ind, sizeof(int),1,indice);    
@@ -140,127 +142,167 @@ void atualiza(int a){
     fwrite(&ind, sizeof(int),1,indice);
     return;
 }
-int pega_chave(){
+int pega_chave(){//pega a chave que deve ser inserida e concatena
     int ind_add, chave;
 
     fseek(principal, 0 , 0);
     fread(&ind_add, sizeof(int), 1, principal);
-
     //variavel auxiliar
     char codf[3], codc[3];
     strcpy(codc,add[ind_add].CodCli);
     strcpy(codf,add[ind_add].CodF); 
-
     //concatena
     strcat(codc,codf);
-
+    //trabsforma em inteiro
     chave=atoi(codc);
 
     return chave;
 }
-void insere_registro(){
-    int tentativa=0,
-    end,
-    chave,
-    i, ind_add, h,e;
+void insere_registro(){//funcao para inserir registros no hash e no arquivo principal
+    int tentativa=1,end,chave,i, ind_add, h,e, aux=-1, cont=1;
+    BOOL achou=false;
     
+    //recupera a chave e o endereco original em que ela deve ser escrita
     chave=pega_chave();
     end=endereco(chave);
-    for(i=0; i<13; i++){
-        fseek(indice,8*i,0);//valor
-        fread(&h,sizeof(int), 1, indice);//lendo chaves
-        if(h==chave){
-            printf("Chave %d duplicada\n", chave);
-            fseek(principal, 0 , 0);
-            fread(&ind_add, sizeof(int), 1, principal);
-            ind_add++;
-            fseek(principal, 0, 0);
-            fwrite(&ind_add, sizeof(int), 1, principal);
-            return;
+    
+    for(i=end;i<13;i++){
+        fseek(indice,8*i,0);
+        fread(&h,sizeof(int), 1, indice);//le a chave
+        if(h!=0){//pode ser -1 ou outra chave
+            cont++;
+            if(h==-1 && aux==-1){//pode inserir onde e -1 //aux=-1 quer dizer que ainda nao achou um lugar para a nova chave
+                tentativa=cont;//numero de tentativas/colisoes
+                aux=i;//atualiza aux com a posicao que a chave deve ser inserida
+            }
+            if(chave==h){//ja existe a chave
+                printf("Chave %d duplicada\n", chave);
+                //atualiza o indice de insercoes no header
+                fseek(principal, 0 , 0);
+                fread(&ind_add, sizeof(int), 1, principal);
+                ind_add++;
+                fseek(principal, 0, 0);
+                fwrite(&ind_add, sizeof(int), 1, principal);
+                return;
+            }
+        }else{
+            if(aux==-1){//aux=-1 quer dizer que a chave ainda nao tinha um lugar
+                aux=i;
+                tentativa=cont;
+            }
+            achou=true;
+            break;
         }
     }
-    //valor|bof|valor|bof|valor|bof
-    fseek(indice,end*8,0);//bof
-    fread(&e,sizeof(int), 1, indice);//lendo posicao
-    if(e==0){
-        fseek(indice,-4,SEEK_CUR);
-        fwrite(&chave,sizeof(int),1,indice);//posicao
-        printf("Endereco %d\n", end);
-        printf("Chave %d inserida com sucesso\n", chave);
-        escrever();
-        return;
-    }else{
-        printf("Endereco %d\n", end);
+    if(achou!=true){
+        for(i=0;i<end;i++){
+            fseek(indice,8*i,0);//valor
+            fread(&h,sizeof(int), 1, indice);//lendo chaves
+            if(h!=0){//pode ser -1 ou outra chave
+                cont++;
+                if(h==-1 && aux==-1){//pode inserir onde e -1 //aux=-1 quer dizer que ainda nao achou um lugar para a nova chave
+                    tentativa=cont;//numero de tentativas/colisoes
+                    aux=i;//atualiza aux com a posicao que a chave deve ser inserida
+                }
+                if(chave==h){//ja existe a chave
+                    printf("Chave %d duplicada\n", chave);
+                    //atualiza o indice de insercoes no header
+                    fseek(principal, 0 , 0);
+                    fread(&ind_add, sizeof(int), 1, principal);
+                    ind_add++;
+                    fseek(principal, 0, 0);
+                    fwrite(&ind_add, sizeof(int), 1, principal);
+                    return;
+                }
+            }else{
+                if(aux==-1){//aux=-1 quer dizer que a chave ainda nao tinha um lugar
+                    aux=i;
+                    tentativa=cont;
+                }
+                break;
+            }
+        }
+    }
+
+    fseek(indice, aux*8, 0);//posiciona onde a chave deve ser inserida no hash
+    fwrite(&chave,sizeof(int),1,indice);//escreve a chave
+    printf("Endereco %d\n", end);
+    if(tentativa!=1){
         printf("Colisao\n");
-        fseek(indice,4,SEEK_CUR);
-        for(i=end;i<13;i++){
-            tentativa++; 
-            fread(&e,sizeof(int), 1, indice);//lendo posicao
-            if(e==0){
-                fseek(indice,-4,SEEK_CUR);
-                fwrite(&chave,sizeof(int),1,indice);//posicao
-                printf("Tentativa %d\n", tentativa);
-                printf("Chave %d inserida com sucesso\n", chave);
-                escrever();
-                return;
-            }
-            fseek(indice,4,SEEK_CUR);
-        }
-        rewind(indice);
-        for(i=0; i<end;i++){
-            tentativa++; 
-            fread(&e,sizeof(int), 1, indice);//lendo posicao
-            if(e==0){
-                fseek(indice,-4,SEEK_CUR);
-                fwrite(&chave,sizeof(int),1,indice);//posicao
-                printf("Tentativa %d\n", tentativa);
-                printf("Chave %d inserida com sucesso\n", chave);
-                escrever();
-                return;
-            }
-            fseek(indice,4,SEEK_CUR);
-        }
+        printf("Tentativa %d\n", tentativa);
     }
-    printf("Nao foi possivel inserir\n");    
+    printf("Chave %d inserida com sucesso\n", chave);
+    escrever();//escreve a distancia do header no arquivo principal + o arquivo principal
+
     return;
 }
-void remove_registro(){
-    int ind_remove, chave, end, i, h;
+void remove_registro(){//funcao para remover registros no hash
+    int ind_remove, chave, end, i, h, aux=-1;
+    BOOL achou=false;
 
+    //recupera a chave que deve ser removida
     fseek(principal, 5 , 0);
     fread(&ind_remove, sizeof(int), 1, principal);
-
     //variavel auxiliar
     char codf[3], codc[3];
     strcpy(codc,remocao[ind_remove].CodCli);
     strcpy(codf,remocao[ind_remove].CodF); 
-
-    //char em int
-    int aux2=atoi(codf),
-    aux1=atoi(codc);
-
-    chave = (100*aux1) + aux2;
+    //concatena
+    strcat(codc,codf);
+    //transforma em inteiro e recupera o endereco que era para ela estar
+    chave=atoi(codc);
     end=endereco(chave);
 
-    for(i=0; i<13; i++){
-        fseek(indice,8*i,0);//valor
-        fread(&h,sizeof(int), 1, indice);//lendo chaves
-        if(h==chave){
-            printf("Chave %d removida\n", chave);
-            fseek(indice, -4 , SEEK_CUR);
-            aux1=0;
-            fwrite(&aux1, sizeof(int),1,indice);
-            fwrite(&aux1, sizeof(int),1,indice);
-            ind_remove++;
-            fseek(principal, 5, 0);
-            fwrite(&ind_remove, sizeof(int), 1, principal);
-            return;        
+    for(i=end; i<13; i++){
+        fseek(indice,8*i,0);//posiciona no endereco
+        fread(&h,sizeof(int), 1, indice);//le a chave
+        if(h!=0){//confere se ha um limpo verdadeiro    
+            if(h==chave){//confere se existe a chave
+                printf("Chave %d removida\n", chave);
+                fseek(indice, -4 , SEEK_CUR);
+                //transforma o endereco em um limpo falso
+                aux=-1;
+                fwrite(&aux, sizeof(int),1,indice);
+                fwrite(&aux, sizeof(int),1,indice);
+                //atualiza o indice de removidos no header do arquivo principal
+                ind_remove++;
+                fseek(principal, 5, 0);
+                fwrite(&ind_remove, sizeof(int), 1, principal);
+                return;        
+            }
+        }else{
+            achou=true;
+            break;
+        }
+    }
+    if(achou!=true){
+        rewind(indice);
+        for(i=0; i<end; i++){
+            fseek(indice,8*i,0);//posiciona no endereco
+            fread(&h,sizeof(int), 1, indice);//le a chave
+            if(h!=0){//confere se ha um limpo verdadeiro 
+                if(h==chave){
+                    printf("Chave %d removida\n", chave);
+                    fseek(indice, -4 , SEEK_CUR);
+                    aux=-1;
+                    fwrite(&aux, sizeof(int),1,indice);
+                    fwrite(&aux, sizeof(int),1,indice);
+                    ind_remove++;
+                    fseek(principal, 5, 0);
+                    fwrite(&ind_remove, sizeof(int), 1, principal);
+                    return;        
+                }
+            }else{
+                break;
+            }
         }
     }
     printf("Chave %d não encontrada para remocao\n", chave);
+    //atualiza o indice de removidos
     ind_remove++;
     fseek(principal, 5, 0);
     fwrite(&ind_remove, sizeof(int), 1, principal);
+
     return; 
 }
 void print(int end){
@@ -311,31 +353,39 @@ void busca_registro(){
         for(i=end;i<13;i++){
             tentativa++; 
             fread(&e,sizeof(int), 1, indice);//lendo posicao
-            if(e==chave){
-                printf("Chave %d encontrada, endereco %d, %d acessos\n", chave, end, tentativa);
-                fread(&bof, sizeof(int),1,indice);
-                print(bof);
-                fseek(principal, 10 , 0);
-                ind_busca++;
-                fwrite(&ind_busca, sizeof(int), 1, principal);
-                return;
+            if(e!=0){
+                if(e==chave){
+                    printf("Chave %d encontrada, endereco %d, %d acessos\n", chave, end, tentativa);
+                    fread(&bof, sizeof(int),1,indice);
+                    print(bof);
+                    fseek(principal, 10 , 0);
+                    ind_busca++;
+                    fwrite(&ind_busca, sizeof(int), 1, principal);
+                    return;
+                }
+                fseek(indice,4,SEEK_CUR);
+            }else{
+                break;
             }
-            fseek(indice,4,SEEK_CUR);
         }
         rewind(indice);
         for(i=0; i<end;i++){
             tentativa++; 
             fread(&e,sizeof(int), 1, indice);//lendo posicao
-            if(e==chave){
-                printf("Chave %d encontrada, endereco %d, %d acessos\n", chave, end, tentativa);
-                fread(&bof, sizeof(int),1,indice);
-                print(bof);
-                fseek(principal, 10 , 0);
-                ind_busca++;
-                fwrite(&ind_busca, sizeof(int), 1, principal);
-                return;
+            if(e!=0){
+                if(e==chave){
+                    printf("Chave %d encontrada, endereco %d, %d acessos\n", chave, end, tentativa);
+                    fread(&bof, sizeof(int),1,indice);
+                    print(bof);
+                    fseek(principal, 10 , 0);
+                    ind_busca++;
+                    fwrite(&ind_busca, sizeof(int), 1, principal);
+                    return;
+                }
+                fseek(indice,4,SEEK_CUR);
+            }else{
+                break;
             }
-            fseek(indice,4,SEEK_CUR);
         }
     }
     printf("Chave nao encontrada\n");   
@@ -348,23 +398,31 @@ int main(){
     op; //menu
     inicializa();
     do{
-        printf("\n1-Inserir\n2-Remover\n3-Buscar\n4-Carrega Arquivos\n0-Sair\n");
+        printf("\n1-Inserir\n2-Remover\n3-Buscar\n4-Carrega Arquivos\n0-Sair\nOpcao:");
         scanf("%d", &op);
         switch(op){
         case inserir:
+            printf("------------------------\n");
             insere_registro();
             atualiza(1);
+            printf("------------------------\n");
             break;
         case remover:
+            printf("------------------------\n");
             remove_registro();
             atualiza(2);
+            printf("------------------------\n");
             break;
         case buscar:
+            printf("------------------------\n");
             busca_registro();
             atualiza(0);
+            printf("------------------------\n");
             break;
         case carregar:
+            printf("------------------------\n");
             carrega_arquivos();
+            printf("------------------------\n");
             break;
         default: //sair
             break;
