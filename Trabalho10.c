@@ -103,7 +103,7 @@ int endereco(int chave){//pega o endereco em que a chave deve ser inserida
     return end;
 }
 void escrever(){//escreve no arquivo principal
-    int i, ind_add, distanciap_origem;
+    int ind_add, distanciap_origem;
 
     //coleta dos indices
     fseek(principal, 0, 0);
@@ -159,7 +159,7 @@ int pega_chave(){//pega a chave que deve ser inserida e concatena
     return chave;
 }
 void insere_registro(){//funcao para inserir registros no hash e no arquivo principal
-    int tentativa=1,end,chave,i, ind_add, h,e, aux=-1, cont=1;
+    int tentativa=1,end,chave,i, ind_add, h, aux=-1, cont=0;
     BOOL achou=false;
     
     //recupera a chave e o endereco original em que ela deve ser escrita
@@ -187,6 +187,7 @@ void insere_registro(){//funcao para inserir registros no hash e no arquivo prin
             }
         }else{
             if(aux==-1){//aux=-1 quer dizer que a chave ainda nao tinha um lugar
+                cont++;
                 aux=i;
                 tentativa=cont;
             }
@@ -323,7 +324,7 @@ void print(int end){
 }
 void busca_registro(){
     int ind_busca, chave, end, e, i, tentativa=1, bof;
-    char registro[156];
+
     fseek(principal, 10 , 0);
     fread(&ind_busca, sizeof(int), 1, principal);
 
